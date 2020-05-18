@@ -2,38 +2,6 @@
 
 ## Unreleased
 
-## 0.5.1
-
-**2020-03-30**
-
-### Bug Fixes
-
-- [boltdb] [\#81](https://github.com/tendermint/tm-db/pull/81) Use correct import path go.etcd.io/bbolt
-
-## 0.5.0
-
-**2020-03-11**
-
-### Breaking Changes
-
-- [\#71](https://github.com/tendermint/tm-db/pull/71) Closed or written batches can no longer be reused, all non-`Close()` calls will panic
-
-- [memdb] [\#74](https://github.com/tendermint/tm-db/pull/74) `Iterator()` and `ReverseIterator()` now take out database read locks for the duration of the iteration
-
-- [memdb] [\#56](https://github.com/tendermint/tm-db/pull/56) Removed some exported methods that were mainly meant for internal use: `Mutex()`, `SetNoLock()`, `SetNoLockSync()`, `DeleteNoLock()`, and `DeleteNoLockSync()`
-
-### Improvements
-
-- [memdb] [\#53](https://github.com/tendermint/tm-db/pull/53) Use a B-tree for storage, which significantly improves range scan performance
-
-- [memdb] [\#56](https://github.com/tendermint/tm-db/pull/56) Use an RWMutex for improved performance with highly concurrent read-heavy workloads
-
-### Bug Fixes
-
-- [boltdb] [\#69](https://github.com/tendermint/tm-db/pull/69) Properly handle blank keys in iterators
-
-- [cleveldb] [\#65](https://github.com/tendermint/tm-db/pull/65) Fix handling of empty keys as iterator endpoints
-
 ## 0.4.1
 
 **2020-2-26**
