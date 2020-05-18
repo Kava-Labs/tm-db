@@ -11,6 +11,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Register a test backend for PrefixDB as well, with some unrelated junk data
+func init() {
+	// nolint: errcheck
+	registerDBCreator("prefixdb", func(name, dir string) (DB, error) {
+		mdb := NewMemDB()
+		mdb.Set([]byte("a"), []byte{1})
+		mdb.Set([]byte("b"), []byte{2})
+		mdb.Set([]byte("t"), []byte{20})
+		mdb.Set([]byte("test"), []byte{0})
+		mdb.Set([]byte("u"), []byte{21})
+		mdb.Set([]byte("z"), []byte{26})
+		return NewPrefixDB(mdb, []byte("test/")), nil
+	}, false)
+}
+
 func cleanupDBDir(dir, name string) {
 	err := os.RemoveAll(filepath.Join(dir, name) + ".db")
 	if err != nil {
@@ -204,6 +219,7 @@ func TestDBIterator(t *testing.T) {
 	for dbType := range backends {
 		t.Run(fmt.Sprintf("%v", dbType), func(t *testing.T) {
 			testDBIterator(t, dbType)
+			testDBIteratorBlankKey(t, dbType)
 		})
 	}
 }
@@ -311,6 +327,18 @@ func testDBIterator(t *testing.T, backend BackendType) {
 	verifyIterator(t, ritr,
 		[]int64(nil), "reverse iterator from 7 (ex) to 6")
 
+	ritr, err = db.ReverseIterator(int642Bytes(10), nil)
+	require.NoError(t, err)
+	verifyIterator(t, ritr, []int64(nil), "reverse iterator to 10")
+
+	ritr, err = db.ReverseIterator(int642Bytes(6), nil)
+	require.NoError(t, err)
+	verifyIterator(t, ritr, []int64{9, 8, 7}, "reverse iterator to 6")
+
+	ritr, err = db.ReverseIterator(int642Bytes(5), nil)
+	require.NoError(t, err)
+	verifyIterator(t, ritr, []int64{9, 8, 7, 5}, "reverse iterator to 5")
+
 	// verifyIterator(t, db.Iterator(int642Bytes(0), int642Bytes(1)), []int64{0}, "forward iterator from 0 to 1")
 
 	ritr, err = db.ReverseIterator(int642Bytes(8), int642Bytes(9))
@@ -329,7 +357,56 @@ func testDBIterator(t *testing.T, backend BackendType) {
 	require.NoError(t, err)
 	verifyIterator(t, ritr,
 		[]int64(nil), "reverse iterator from 2 (ex) to 4")
+}
 
+func testDBIteratorBlankKey(t *testing.T, backend BackendType) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db := NewDB(name, backend, dir)
+	defer cleanupDBDir(dir, name)
+
+	err := db.Set([]byte(""), []byte{0})
+	require.NoError(t, err)
+	err = db.Set([]byte("a"), []byte{1})
+	require.NoError(t, err)
+	err = db.Set([]byte("b"), []byte{2})
+	require.NoError(t, err)
+
+	value, err := db.Get([]byte(""))
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0}, value)
+
+	i, err := db.Iterator(nil, nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"", "a", "b"}, "forward")
+
+	i, err = db.Iterator([]byte(""), nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"", "a", "b"}, "forward from blank")
+
+	i, err = db.Iterator([]byte("a"), nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"a", "b"}, "forward from a")
+
+	i, err = db.Iterator([]byte(""), []byte("b"))
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"", "a"}, "forward from blank to b")
+
+	i, err = db.ReverseIterator(nil, nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"b", "a", ""}, "reverse")
+
+	i, err = db.ReverseIterator([]byte(""), nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"b", "a", ""}, "reverse to blank")
+
+	i, err = db.ReverseIterator([]byte(""), []byte("a"))
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{""}, "reverse to blank from a")
+
+	i, err = db.ReverseIterator([]byte("a"), nil)
+	require.NoError(t, err)
+	verifyIteratorStrings(t, i, []string{"b", "a"}, "reverse to a")
 }
 
 func verifyIterator(t *testing.T, itr Iterator, expected []int64, msg string) {
@@ -340,4 +417,107 @@ func verifyIterator(t *testing.T, itr Iterator, expected []int64, msg string) {
 		itr.Next()
 	}
 	assert.Equal(t, expected, list, msg)
+}
+
+func verifyIteratorStrings(t *testing.T, itr Iterator, expected []string, msg string) {
+	var list []string
+	for itr.Valid() {
+		key := itr.Key()
+		list = append(list, string(key))
+		itr.Next()
+	}
+	assert.Equal(t, expected, list, msg)
+}
+
+func TestDBBatch(t *testing.T) {
+	for dbType := range backends {
+		t.Run(fmt.Sprintf("%v", dbType), func(t *testing.T) {
+			testDBBatch(t, dbType)
+		})
+	}
+}
+
+func testDBBatch(t *testing.T, backend BackendType) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db := NewDB(name, backend, dir)
+	defer cleanupDBDir(dir, name)
+
+	// create a new batch, and some items - they should not be visible until we write
+	batch := db.NewBatch()
+	batch.Set([]byte("a"), []byte{1})
+	batch.Set([]byte("b"), []byte{2})
+	batch.Set([]byte("c"), []byte{3})
+	assertKeyValues(t, db, map[string][]byte{})
+
+	err := batch.Write()
+	require.NoError(t, err)
+	assertKeyValues(t, db, map[string][]byte{"a": {1}, "b": {2}, "c": {3}})
+
+	// trying to modify or rewrite a written batch should panic, but closing it should work
+	require.Panics(t, func() { batch.Set([]byte("a"), []byte{9}) })
+	require.Panics(t, func() { batch.Delete([]byte("a")) })
+	require.Panics(t, func() { batch.Write() })     // nolint: errcheck
+	require.Panics(t, func() { batch.WriteSync() }) // nolint: errcheck
+	batch.Close()
+
+	// batches should write changes in order
+	batch = db.NewBatch()
+	batch.Delete([]byte("a"))
+	batch.Set([]byte("a"), []byte{1})
+	batch.Set([]byte("b"), []byte{1})
+	batch.Set([]byte("b"), []byte{2})
+	batch.Set([]byte("c"), []byte{3})
+	batch.Delete([]byte("c"))
+	err = batch.Write()
+	require.NoError(t, err)
+	batch.Close()
+	assertKeyValues(t, db, map[string][]byte{"a": {1}, "b": {2}})
+
+	// writing nil keys and values should be the same as empty keys and values
+	// FIXME CLevelDB panics here: https://github.com/jmhodges/levigo/issues/55
+	if backend != CLevelDBBackend {
+		batch = db.NewBatch()
+		batch.Set(nil, nil)
+		err = batch.WriteSync()
+		require.NoError(t, err)
+		assertKeyValues(t, db, map[string][]byte{"": {}, "a": {1}, "b": {2}})
+
+		batch = db.NewBatch()
+		batch.Delete(nil)
+		err = batch.Write()
+		require.NoError(t, err)
+		assertKeyValues(t, db, map[string][]byte{"a": {1}, "b": {2}})
+	}
+
+	// it should be possible to write an empty batch
+	batch = db.NewBatch()
+	err = batch.Write()
+	require.NoError(t, err)
+	assertKeyValues(t, db, map[string][]byte{"a": {1}, "b": {2}})
+
+	// it should be possible to close an empty batch, and to re-close a closed batch
+	batch = db.NewBatch()
+	batch.Close()
+	batch.Close()
+
+	// all other operations on a closed batch should panic
+	require.Panics(t, func() { batch.Set([]byte("a"), []byte{9}) })
+	require.Panics(t, func() { batch.Delete([]byte("a")) })
+	require.Panics(t, func() { batch.Write() })     // nolint: errcheck
+	require.Panics(t, func() { batch.WriteSync() }) // nolint: errcheck
+}
+
+func assertKeyValues(t *testing.T, db DB, expect map[string][]byte) {
+	iter, err := db.Iterator(nil, nil)
+	require.NoError(t, err)
+	defer iter.Close()
+
+	actual := make(map[string][]byte)
+	for ; iter.Valid(); iter.Next() {
+		require.NoError(t, iter.Error())
+		actual[string(iter.Key())] = iter.Value()
+	}
+
+	assert.Equal(t, expect, actual)
 }
