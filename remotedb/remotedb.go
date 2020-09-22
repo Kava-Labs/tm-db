@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	db "github.com/tendermint/tm-db"
-	"github.com/tendermint/tm-db/remotedb/grpcdb"
-	protodb "github.com/tendermint/tm-db/remotedb/proto"
+	db "github.com/kava-labs/tm-db"
+	"github.com/kava-labs/tm-db/remotedb/grpcdb"
+	protodb "github.com/kava-labs/tm-db/remotedb/proto"
 )
 
 type RemoteDB struct {

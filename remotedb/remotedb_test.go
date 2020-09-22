@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tendermint/tm-db/remotedb"
-	"github.com/tendermint/tm-db/remotedb/grpcdb"
+	"github.com/kava-labs/tm-db/remotedb"
+	"github.com/kava-labs/tm-db/remotedb/grpcdb"
 )
 
 func TestRemoteDB(t *testing.T) {
