@@ -7,17 +7,17 @@
 # updates here, merge the changes here first and let the image get updated (or
 # push a new version manually) before PRs that depend on them.
 
-FROM golang:1.17-bullseye AS build
+FROM golang:1.18-bullseye AS build
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libbz2-dev libgflags-dev libsnappy-dev libzstd-dev zlib1g-dev \
+    liblz4-dev libbz2-dev libgflags-dev libsnappy-dev libzstd-dev zlib1g-dev \
     make tar wget
 
 FROM build AS install
 ARG LEVELDB=1.20
-ARG ROCKSDB=6.24.2
+ARG ROCKSDB=7.1.2
 
 # Install cleveldb
 RUN \
