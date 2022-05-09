@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 FROM build AS install
 ARG LEVELDB=1.23
-ARG ROCKSDB=7.0.4
+ARG ROCKSDB=7.1.2
 
 # Install cleveldb
 RUN \
