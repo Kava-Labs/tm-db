@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"os"
 
 	"github.com/cosmos/gorocksdb"
 )
@@ -50,7 +51,10 @@ func NewRocksDBWithOptions(name string, dir string, opts *gorocksdb.Options) (*R
 	dbPath := filepath.Join(dir, name+".db")
 	db, err := gorocksdb.OpenDb(opts, dbPath)
 	if err != nil {
-		return nil, err
+		err = os.MkdirAll(dbPath, 0755)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ro := gorocksdb.NewDefaultReadOptions()
 	wo := gorocksdb.NewDefaultWriteOptions()
