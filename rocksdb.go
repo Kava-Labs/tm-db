@@ -73,6 +73,15 @@ func NewRocksDBWithOptions(name string, dir string, opts *grocksdb.Options) (*Ro
 	return database, nil
 }
 
+func NewRocksDBWithRawDB(db *grocksdb.DB, ro *grocksdb.ReadOptions, wo *grocksdb.WriteOptions, woSync *grocksdb.WriteOptions) *RocksDB {
+	return &RocksDB{
+		db:     db,
+		ro:     ro,
+		wo:     wo,
+		woSync: woSync,
+	}
+}
+
 // Get implements DB.
 func (db *RocksDB) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
