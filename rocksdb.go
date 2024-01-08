@@ -5,6 +5,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -47,6 +48,11 @@ func NewRocksDB(name string, dir string) (*RocksDB, error) {
 
 func NewRocksDBWithOptions(name string, dir string, opts *grocksdb.Options) (*RocksDB, error) {
 	dbPath := filepath.Join(dir, name+".db")
+
+	if err := os.MkdirAll(dbPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create db path: %w", err)
+	}
+
 	db, err := grocksdb.OpenDb(opts, dbPath)
 	if err != nil {
 		return nil, err
